@@ -4,3 +4,6 @@
 [submodule "tinyexr"]
 	path = tinyexr
 	url = https://github.com/syoyo/tinyexr
+[submodule "pnm"]
+	path = pnm
+	url = https://github.com/ToruNiina/pnm
