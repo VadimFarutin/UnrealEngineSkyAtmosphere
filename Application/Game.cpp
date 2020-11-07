@@ -1,5 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
+#define _CRT_SECURE_NO_WARNINGS
 
 #include "Game.h"
 #include "GpuDebugRenderer.h"
@@ -7,6 +8,10 @@
 #include "windows.h"
 
 #include <imgui.h>
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "../tinyexr/examples/common/stb_image_write.h"
+
+#include <pnm.hpp>
 
 #undef max
 #define TINYEXR_IMPLEMENTATION
@@ -618,9 +623,9 @@ void Game::update(const WindowInputData& inputData)
 	mCamPosFinal = { 0.0, 0.0f, 0.0f };
 
 	// Camera orientation
-	if (viewPitch > 80.0f) viewPitch = 80.0f;
-	if (viewPitch < -80.0f) viewPitch = -80.0f;
-	XMMATRIX BBB = XMMatrixRotationRollPitchYaw(-viewPitch * 3.14159f / 180.0f, viewYaw*3.14159f / 180.0f, 0.0f);
+    if (viewPitch > 90.0f) viewPitch = 90.0f;
+    if (viewPitch < -90.0f) viewPitch = -90.0f;
+    XMMATRIX BBB = XMMatrixRotationRollPitchYaw(-viewPitch * 3.14159f / 180.0f, viewYaw*3.14159f / 180.0f, 0.0f);
 	XMStoreFloat3(&mViewDir, BBB.r[2]);
 	float3 viewDirCopy = mViewDir;
 	mViewDir.y = viewDirCopy.z;
@@ -1067,17 +1072,134 @@ void Game::render()
 		context->OMSetDepthStencilState(mDefaultDepthStencilState->mState, 0);
 	}
 
-	if (takeScreenShot)
-	{
-		const char* screenShotFilePath = "screenshot.exr";
-		D3dRenderContext* context = g_dx11Device->getDeviceContext();
-		context->CopyResource(mBackBufferHdrStagingTexture->mTexture, mBackBufferHdr->mTexture);
-		saveBackBufferHdr(screenShotFilePath);
-		takeScreenShot = false;
-	}
 	mFrameId++;
 
 }
 
+bool Game::shouldTakeScreenShot() const
+{
+    return takeScreenShot;
+}
+
+void Game::getViewParams(float& viewPitch, float& viewYaw)
+{
+    viewPitch = this->viewPitch;
+    viewYaw = this->viewYaw;
+}
+
+void Game::setViewParams(float viewPitch, float viewYaw)
+{
+    this->viewPitch = viewPitch;
+    this->viewYaw = viewYaw;
+    this->ShouldClearPathTracedBuffer = true;
+}
+
+void Game::saveScreenShot()
+{
+    if (takeScreenShot)
+    {
+        std::string screenShotFilePath = "screenshots/screenshot_" + std::to_string(mFrameId) + ".exr";
+        //const char* screenShotFilePath = "screenshots/screenshot.exr";
+        D3dRenderContext* context = g_dx11Device->getDeviceContext();
+        context->CopyResource(mBackBufferHdrStagingTexture->mTexture, mBackBufferHdr->mTexture);
+        saveBackBufferHdr(screenShotFilePath.c_str());
+        takeScreenShot = false;
+    }
+}
+
+void Game::saveCubemap()
+{
+    static const int cubeFacesNum = 6;
+    static const float2 cubeFacesViewParams[cubeFacesNum] = {
+        float2(0.0, 0.0),   // +X
+        float2(0.0, 180.0), // -X
+        float2(0.0, 90.0),  // +Y
+        float2(0.0, -90.0), // -Y
+        float2(90.0, 0.0),  // +Z
+        float2(-90.0, 0.0), // -Z
+    };
+    std::string cubemapFilePathPPM = "screenshots/cubemap_" + std::to_string(mFrameId) + ".ppm";
+    std::string cubemapFilePathHDR = "screenshots/cubemap_" + std::to_string(mFrameId) + ".hdr";
+
+    WindowInputData inputData;
+    inputData.init();
+
+    using namespace pnm::literals;
+    
+    int width = mBackBufferHdr->mDesc.Width;
+    int height = mBackBufferHdr->mDesc.Height;
+    //pnm::image<pnm::rgb_pixel> cubemap(width * cubeFacesNum, height, 0xFF0000_rgb);
+    float* cubemap_raw = new float[width * cubeFacesNum * height * 4];
+
+    for (int face = 0; face < cubeFacesNum; face++)
+    {
+        DxGpuPerformance::startFrame();
+        const char* frameGpuTimerName = "Frame";
+        DxGpuPerformance::startGpuTimer(frameGpuTimerName, 150, 150, 150);
+        ImGui::NewFrame();
+
+        setViewParams(cubeFacesViewParams[face].x, cubeFacesViewParams[face].y);
+        update(inputData);
+        render();
+
+        D3dRenderContext* context = g_dx11Device->getDeviceContext();
+        context->CopyResource(mBackBufferHdrStagingTexture->mTexture, mBackBufferHdr->mTexture);
+
+        const D3D11_TEXTURE2D_DESC& desc = mBackBufferHdrStagingTexture->mDesc;
+        ATLASSERT(desc.Format == DXGI_FORMAT_R32G32B32A32_FLOAT);
+
+        //D3dRenderContext* context = g_dx11Device->getDeviceContext();
+        D3D11_MAPPED_SUBRESOURCE mappedResource;
+        HRESULT res = context->Map(mBackBufferHdrStagingTexture->mTexture, 0, D3D11_MAP_READ, 0, &mappedResource);
+        ATLASSERT(res == S_OK);
+        if (res == S_OK)
+        {
+            const float* data = (float*)mappedResource.pData;
+
+            //float max_value = 0.0;
+            //for (int p = 0; p < height * width; p++)
+            //{
+            //    int i = p * 4;
+            //    for (int j = 0; j < 3; j++)
+            //    {
+            //        max_value = MZ_MAX(max_value, data[i + j]);
+            //    }
+            //}
+            //if (max_value == 0.0)
+            //{
+            //    max_value = 1.0;
+            //}
+
+            for (int y = 0; y < height; y++)
+                for (int x = 0; x < width; x++)
+                {
+                    int i = (y * width + x) * 4;
+                    float sampleCount = data[i + 3];
+                    sampleCount = sampleCount > 0.0f ? sampleCount : 1.0f;
+
+                    //cubemap[y][x + face * width] = pnm::rgb_pixel(
+                    //    255.0 * data[i] / sampleCount,
+                    //    255.0 * data[i + 1] / sampleCount,
+                    //    255.0 * data[i + 2] / sampleCount);
+
+                    cubemap_raw[(y * width * cubeFacesNum + face * width + x) * 4] = data[i] / sampleCount;
+                    cubemap_raw[(y * width * cubeFacesNum + face * width + x) * 4 + 1] = data[i + 1] / sampleCount;
+                    cubemap_raw[(y * width * cubeFacesNum + face * width + x) * 4 + 2] = data[i + 2] / sampleCount;
+                    cubemap_raw[(y * width * cubeFacesNum + face * width + x) * 4 + 3] = 1.0f;
+                }
+
+            context->Unmap(mBackBufferHdrStagingTexture->mTexture, 0);
+        }
+
+        ImGui::EndFrame();
+        DxGpuPerformance::endGpuTimer(frameGpuTimerName);
+        DxGpuPerformance::endFrame();
+    }
+
+    stbi_write_hdr(cubemapFilePathHDR.c_str(), width * cubeFacesNum, height, 4, cubemap_raw);
+    delete[] cubemap_raw;
+
+    //pnm::write_ppm_ascii(cubemapFilePathPPM, cubemap);
+}
 
 

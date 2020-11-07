@@ -41,6 +41,13 @@ public:
 	void update(const WindowInputData& inputData);
 	void render();
 
+    bool shouldTakeScreenShot() const;
+    void getViewParams(float& viewPitch, float& viewYaw);
+    void setViewParams(float viewPitch, float viewYaw);
+
+    void saveScreenShot();
+    void saveCubemap();
+
 private:
 
 	/// Load/reload all shaders if compilation is succesful.

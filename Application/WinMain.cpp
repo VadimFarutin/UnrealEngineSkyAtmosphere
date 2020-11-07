@@ -110,6 +110,13 @@ int WINAPI WinMain(HINSTANCE hInstance,
 			// Game render
 			game.render();
 
+            // Save screenshot
+            bool shouldTakeScreenShot = game.shouldTakeScreenShot();
+            if (shouldTakeScreenShot)
+            {
+                game.saveScreenShot();
+            }
+
 			// Render UI
 			{
 				//ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);     // Normally user code doesn't need/want to call it because positions are saved in .ini file anyway. Here we just want to make the demo initial state a bit more friendly!
@@ -231,6 +238,17 @@ int WINAPI WinMain(HINSTANCE hInstance,
 			g_dx11Device->swap(sVSyncEnable);
 			DxGpuPerformance::endGpuTimer(frameGpuTimerName);
 			DxGpuPerformance::endFrame();
+
+            // Save cubemap
+            if (shouldTakeScreenShot)
+            {
+                float viewPitch;
+                float viewYaw;
+
+                game.getViewParams(viewPitch, viewYaw);
+                game.saveCubemap();
+                game.setViewParams(viewPitch, viewYaw);
+            }
 
 			// Events have all been processed in this path by the game
 			win.clearInputEvents();
