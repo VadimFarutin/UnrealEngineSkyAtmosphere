@@ -334,6 +334,7 @@ imgui\.ini
 *.cap
 
 screenshot\.exr
+screenshots/
 
 # Ignore folders with reference captures
 _*/
