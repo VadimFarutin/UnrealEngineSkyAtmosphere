@@ -642,8 +642,9 @@ void Game::update(const WindowInputData& inputData)
 		FXMVECTOR upDirection = { 0.0f, 0.0f, 1.0f, 0.0f };	// Unreal z-up
 
 		XMMATRIX viewMatrix = XMMatrixLookAtLH(eyePosition, focusPosition, upDirection);
-		XMMATRIX projMatrix = XMMatrixPerspectiveFovLH(66.6f*3.14159f / 180.0f, aspectRatioXOverY, 0.1f, 20000.0f);
-		mViewProjMat = XMMatrixMultiply(viewMatrix, projMatrix);
+		//XMMATRIX projMatrix = XMMatrixPerspectiveFovLH(66.6f*3.14159f / 180.0f, aspectRatioXOverY, 0.1f, 20000.0f);
+        XMMATRIX projMatrix = XMMatrixPerspectiveFovLH(90.0f / 180.0f * 3.14159f, aspectRatioXOverY, 0.1f, 20000.0f);
+        mViewProjMat = XMMatrixMultiply(viewMatrix, projMatrix);
 	}
 
 	XMMATRIX sunMatrix = XMMatrixRotationRollPitchYaw(-uiSunPitch, uiSunYaw, 0.0f);
