@@ -807,6 +807,8 @@ void Game::render()
 		ImGui::Text("View");
 		ImGui::SliderFloat("Height", &uiCamHeight, 0.001f, 2.0f*(AtmosphereInfos.top_radius - AtmosphereInfos.bottom_radius), "%.3f", 3.0f);
 		ImGui::SliderFloat("Forward", &uiCamForward, -3.0f*AtmosphereInfos.top_radius, -1.0f, "%.3f", 3.0f);
+        ImGui::SliderFloat("View Yaw", &viewYaw, -180.0f, 180.0f);
+        ImGui::SliderFloat("View Pitch", &viewPitch, -90.0f, 90.0f);
 
 		ImGui::Text("Sun");
 		ImGui::SliderFloat("IllumScale", &mSunIlluminanceScale, 0.1f, 100.0f, "%.3f", 3.0f);
