@@ -620,7 +620,9 @@ void Game::update(const WindowInputData& inputData)
 
 	const D3dViewport& backBufferViewport = g_dx11Device->getBackBufferViewport();
 	float aspectRatioXOverY = backBufferViewport.Width / backBufferViewport.Height;
-	mCamPosFinal = { 0.0, 0.0f, 0.0f };
+    mBackBufferViewportWidth = backBufferViewport.Width;
+    mBackBufferViewportHeight = backBufferViewport.Height;
+    mCamPosFinal = { 0.0, 0.0f, 0.0f };
 
 	// Camera orientation
     if (viewPitch > 90.0f) viewPitch = 90.0f;
@@ -798,6 +800,9 @@ void Game::render()
 		ImGui::Checkbox("UpdateDebug", &mUpdateDebugState);
 		ImGui::Checkbox("PrintDebug", &mPrintDebug);
 		ImGui::Separator();
+
+        ImGui::Text(std::string("Viewport Width: " + std::to_string(mBackBufferViewportWidth)).c_str());
+        ImGui::Text(std::string("Viewport Height: " + std::to_string(mBackBufferViewportHeight)).c_str());
 
 		ImGui::Text("View");
 		ImGui::SliderFloat("Height", &uiCamHeight, 0.001f, 2.0f*(AtmosphereInfos.top_radius - AtmosphereInfos.bottom_radius), "%.3f", 3.0f);

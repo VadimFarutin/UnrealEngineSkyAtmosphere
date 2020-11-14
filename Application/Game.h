@@ -254,6 +254,9 @@ private:
 	const uint32 ShadowmapSize = 4096;
 	float4x4 mShadowmapViewProjMat;
 
+    float mBackBufferViewportWidth;
+    float mBackBufferViewportHeight;
+
 	float4x4 mViewProjMat;
 	float3   mCamPos;
 	float3   mCamPosFinal;
