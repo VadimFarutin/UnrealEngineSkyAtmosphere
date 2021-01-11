@@ -1121,7 +1121,7 @@ void Game::saveScreenShot()
     }
 }
 
-void Game::saveCubemap()
+void Game::saveCubemap(FileType type)
 {
     static const float2 cubeFacesViewParams[CUBE_FACES_NUM] = {
         float2(0.0, 180.0), // -X
@@ -1176,9 +1176,6 @@ void Game::saveCubemap()
         //float2(90.0, 0.0),  // +Z
         //float2(-90.0, 0.0), // -Z
     //};
-    std::string cubemapFilePathPPM = "screenshots/cubemap_" + std::to_string(mFrameId) + ".ppm";
-    std::string cubemapFilePathHDR = "screenshots/cubemap_" + std::to_string(mFrameId) + ".hdr";
-    std::string cubemapFilePathEXR = "screenshots/cubemap_" + std::to_string(mFrameId) + ".exr";
 
     WindowInputData inputData;
     inputData.init();
@@ -1187,7 +1184,7 @@ void Game::saveCubemap()
     
     int width = mBackBufferHdr->mDesc.Width;
     int height = mBackBufferHdr->mDesc.Height;
-    //pnm::image<pnm::rgb_pixel> cubemap(width * CUBE_FACES_NUM, height, 0xFF0000_rgb);
+    pnm::image<pnm::rgb_pixel> cubemap(width * CUBE_FACES_NUM, height, 0xFF0000_rgb);
     float* cubemap_raw = new float[width * CUBE_FACES_NUM * height * 4];
 	float* custom_cubemap = new float[width * CUBE_FACES_NUM * height * 4];
 	generateWhiteCornerCubemap(width, height, custom_cubemap);
@@ -1239,37 +1236,47 @@ void Game::saveCubemap()
                     sampleCount = sampleCount > 0.0f ? sampleCount : 1.0f;
 					int cubemap_idx = getCubemapIdx(x, y, face, width, height);
 
-					// PNM.
-                    //cubemap[y][x + face * width] = pnm::rgb_pixel(
-                    //    255.0 * data[i] / sampleCount,
-                    //    255.0 * data[i + 1] / sampleCount,
-                    //    255.0 * data[i + 2] / sampleCount);
+					switch (type)
+					{
+					case HDR:
+					case EXR:
+						// Screenshot.
+						cubemap_raw[cubemap_idx + 0] = data[i] / sampleCount;
+						cubemap_raw[cubemap_idx + 1] = data[i + 1] / sampleCount;
+						cubemap_raw[cubemap_idx + 2] = data[i + 2] / sampleCount;
+						cubemap_raw[cubemap_idx + 3] = 1.0f;
 
-					// Screenshot.
-                    cubemap_raw[cubemap_idx + 0] = data[i] / sampleCount;
-                    cubemap_raw[cubemap_idx + 1] = data[i + 1] / sampleCount;
-                    cubemap_raw[cubemap_idx + 2] = data[i + 2] / sampleCount;
-                    cubemap_raw[cubemap_idx + 3] = 1.0f;
+						// Tone mapping.
+						//float3 white_point = float3(1.08241, 0.96756, 0.95003);
+						//float exposure = 10.0;
+						//float3 rgbA(
+						//    pow(1.0 - exp(-data[i + 0] / sampleCount / white_point.x * exposure), 1.0 / 2.2),
+						//    pow(1.0 - exp(-data[i + 1] / sampleCount / white_point.y * exposure), 1.0 / 2.2),
+						//    pow(1.0 - exp(-data[i + 2] / sampleCount / white_point.z * exposure), 1.0 / 2.2));
 
-					// Tone mapping.
-                    //float3 white_point = float3(1.08241, 0.96756, 0.95003);
-                    //float exposure = 10.0;
-                    //float3 rgbA(
-                    //    pow(1.0 - exp(-data[i + 0] / sampleCount / white_point.x * exposure), 1.0 / 2.2),
-                    //    pow(1.0 - exp(-data[i + 1] / sampleCount / white_point.y * exposure), 1.0 / 2.2),
-                    //    pow(1.0 - exp(-data[i + 2] / sampleCount / white_point.z * exposure), 1.0 / 2.2));
-                    
-					// Single color sides.
-					//cubemap_raw[cubemap_idx + 0] = colors[face].x;
-                    //cubemap_raw[cubemap_idx + 1] = colors[face].y;
-                    //cubemap_raw[cubemap_idx + 2] = colors[face].z;
-                    //cubemap_raw[cubemap_idx + 3] = 1.0f;
+						// Single color sides.
+						//cubemap_raw[cubemap_idx + 0] = colors[face].x;
+						//cubemap_raw[cubemap_idx + 1] = colors[face].y;
+						//cubemap_raw[cubemap_idx + 2] = colors[face].z;
+						//cubemap_raw[cubemap_idx + 3] = 1.0f;
 
-					// Custom sides.
-					//cubemap_raw[cubemap_idx + 0] = custom_cubemap[cubemap_idx + 0];
-					//cubemap_raw[cubemap_idx + 1] = custom_cubemap[cubemap_idx + 1];
-					//cubemap_raw[cubemap_idx + 2] = custom_cubemap[cubemap_idx + 2];
-					//cubemap_raw[cubemap_idx + 3] = 1.0f;
+						// Custom sides.
+						//cubemap_raw[cubemap_idx + 0] = custom_cubemap[cubemap_idx + 0];
+						//cubemap_raw[cubemap_idx + 1] = custom_cubemap[cubemap_idx + 1];
+						//cubemap_raw[cubemap_idx + 2] = custom_cubemap[cubemap_idx + 2];
+						//cubemap_raw[cubemap_idx + 3] = 1.0f;
+
+						break;
+					case PPM:
+						// PNM.
+						cubemap[y][x + face * width] = pnm::rgb_pixel(
+						    255.0 * data[i] / sampleCount,
+						    255.0 * data[i + 1] / sampleCount,
+						    255.0 * data[i + 2] / sampleCount);
+						break;
+					default:
+						break;
+					}
                 }
 
             context->Unmap(mBackBufferHdrStagingTexture->mTexture, 0);
@@ -1280,14 +1287,11 @@ void Game::saveCubemap()
         DxGpuPerformance::endFrame();
     }
 
-    //const char *err = nullptr;
-    //SaveEXR(cubemap_raw, width * CUBE_FACES_NUM, height, 4, 0, cubemapFilePathEXR.c_str(), &err);
+	writeCubemapToFile(type, width, height, cubemap_raw, &cubemap);
 
 	delete[] custom_cubemap;
-    stbi_write_hdr(cubemapFilePathHDR.c_str(), width * CUBE_FACES_NUM, height, 4, cubemap_raw);
     delete[] cubemap_raw;
 
-    //pnm::write_ppm_ascii(cubemapFilePathPPM, cubemap);
 }
 
 void Game::generateWhiteCornerCubemap(int width, int height, float* dest)
@@ -1336,3 +1340,60 @@ int Game::getCubemapIdx(int x, int y, int face, int width, int height)
 	return (y * width * CUBE_FACES_NUM + face * width + x) * 4;
 }
 
+std::string Game::getCubemapPath(FileType type, uint32 frameId)
+{
+	std::string cubemapFilePath = "screenshots/cubemap_" + std::to_string(frameId);
+	std::string extension = "";
+
+	switch (type)
+	{
+	case HDR:
+		extension = ".hdr";
+		break;
+	case EXR:
+		extension = ".exr";
+		break;
+	case PPM:
+		extension = ".ppm";
+		break;
+	default:
+		break;
+	}
+
+	cubemapFilePath = cubemapFilePath + extension;
+
+	return cubemapFilePath;
+}
+
+void Game::writeCubemapToFile(
+	FileType type,
+	int width, int height,
+	float* src, pnm::image<pnm::rgb_pixel>* image)
+{
+	std::string cubemapFilePath = getCubemapPath(type, mFrameId);
+
+	switch (type)
+	{
+	case HDR:
+		if (src != nullptr)
+		{
+			stbi_write_hdr(cubemapFilePath.c_str(), width * CUBE_FACES_NUM, height, 4, src);
+		}
+		break;
+	case EXR:
+		if (src != nullptr)
+		{
+			const char* err = nullptr;
+			SaveEXR(src, width * CUBE_FACES_NUM, height, 4, 0, cubemapFilePath.c_str(), &err);
+		}
+		break;
+	case PPM:
+		if (image != nullptr)
+		{
+			pnm::write_ppm_ascii(cubemapFilePath, *image);
+		}
+		break;
+	default:
+		break;
+	}
+}

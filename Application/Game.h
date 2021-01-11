@@ -28,6 +28,12 @@ struct CaptureState
 	std::vector<CaptureEvent> events;
 };
 
+enum FileType {
+	HDR = 0,
+	EXR,
+	PPM,
+};
+
 class Game
 {
 public:
@@ -46,7 +52,7 @@ public:
     void setViewParams(float viewPitch, float viewYaw);
 
     void saveScreenShot();
-    void saveCubemap();
+    void saveCubemap(FileType type = HDR);
 
 private:
 
@@ -377,8 +383,15 @@ private:
 	void LoadState();
 
 	static const int CUBE_FACES_NUM;
+	
 	void generateWhiteCornerCubemap(int width, int height, float* dest);
 	int getCubemapIdx(int x, int y, int face, int width, int height);
+
+	std::string getCubemapPath(FileType type, uint32 frameId);
+	void writeCubemapToFile(
+		FileType type,
+		int width, int height,
+		float* src, pnm::image<pnm::rgb_pixel>* image);
 };
 
 
