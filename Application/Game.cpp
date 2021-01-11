@@ -69,7 +69,10 @@ void Game::loadShaders(bool firstTimeLoadShaders)
 	const bool lazyCompilation = true;
 	success &= reloadShader(&mVertexShader, L"Resources\\Common.hlsl", "DefaultVertexShader", firstTimeLoadShaders, nullptr, false);				// No lazy compilation because it is used to create a layout
 	success &= reloadShader(&mScreenVertexShader, L"Resources\\Common.hlsl", "ScreenTriangleVertexShader", firstTimeLoadShaders, nullptr, false);	// No lazy compilation because it is used to create a layout
-	success &= reload(&mPostProcessShader, L"Resources\\PostProcess.hlsl", "PostProcessPS", firstTimeLoadShaders, nullptr, lazyCompilation);
+	if (mPostProcess)
+        success &= reload(&mPostProcessShader, L"Resources\\PostProcess.hlsl", "PostProcessPS", firstTimeLoadShaders, nullptr, lazyCompilation);
+	else
+		success &= reload(&mPostProcessShader, L"Resources\\PostProcess.hlsl", "NoPostProcessPS", firstTimeLoadShaders, nullptr, lazyCompilation);
 	success &= reload(&mApplySkyAtmosphereShader, L"Resources\\PostProcess.hlsl", "ApplySkyAtmospherePS", firstTimeLoadShaders, nullptr, lazyCompilation);
 
 	success &= reload(&GeometryGS, L"Resources\\Common.hlsl", "LutGS", firstTimeLoadShaders, nullptr, lazyCompilation);
@@ -902,6 +905,8 @@ void Game::render()
 			if (ImGui::IsItemHovered())
 				ImGui::SetTooltip("If DualScattering>0, the path tracer will use it and stop at the first path depth.");
 		}
+
+        ImGui::Checkbox("Post process", &mPostProcess);
 
 		ImGui::End();
 		////////////////////////////////////////////////////////////////////////////////////////////////////

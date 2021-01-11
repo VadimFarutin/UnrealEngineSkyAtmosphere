@@ -349,6 +349,8 @@ private:
 
 	bool RenderTerrain = true;
 
+    bool mPostProcess = true;
+
 	// Render functions
 	void updateSkyAtmosphereConstant();
 	void generateSkyAtmosphereLUTs();
