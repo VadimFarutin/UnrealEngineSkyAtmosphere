@@ -1217,16 +1217,19 @@ void Game::saveCubemap()
                     int i = (y * width + x) * 4;
                     float sampleCount = data[i + 3];
                     sampleCount = sampleCount > 0.0f ? sampleCount : 1.0f;
+					int cubemap_idx = (y * width * cubeFacesNum + face * width + x) * 4;
 
+					// PNM.
                     //cubemap[y][x + face * width] = pnm::rgb_pixel(
                     //    255.0 * data[i] / sampleCount,
                     //    255.0 * data[i + 1] / sampleCount,
                     //    255.0 * data[i + 2] / sampleCount);
 
-                    cubemap_raw[(y * width * cubeFacesNum + face * width + x) * 4] = data[i] / sampleCount;
-                    cubemap_raw[(y * width * cubeFacesNum + face * width + x) * 4 + 1] = data[i + 1] / sampleCount;
-                    cubemap_raw[(y * width * cubeFacesNum + face * width + x) * 4 + 2] = data[i + 2] / sampleCount;
-                    cubemap_raw[(y * width * cubeFacesNum + face * width + x) * 4 + 3] = 1.0f;
+					// Screenshot.
+                    cubemap_raw[cubemap_idx + 0] = data[i] / sampleCount;
+                    cubemap_raw[cubemap_idx + 1] = data[i + 1] / sampleCount;
+                    cubemap_raw[cubemap_idx + 2] = data[i + 2] / sampleCount;
+                    cubemap_raw[cubemap_idx + 3] = 1.0f;
                 }
 
             context->Unmap(mBackBufferHdrStagingTexture->mTexture, 0);
