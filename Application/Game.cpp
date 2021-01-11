@@ -1160,6 +1160,7 @@ void Game::saveCubemap()
     //};
     std::string cubemapFilePathPPM = "screenshots/cubemap_" + std::to_string(mFrameId) + ".ppm";
     std::string cubemapFilePathHDR = "screenshots/cubemap_" + std::to_string(mFrameId) + ".hdr";
+    std::string cubemapFilePathEXR = "screenshots/cubemap_" + std::to_string(mFrameId) + ".exr";
 
     WindowInputData inputData;
     inputData.init();
@@ -1236,6 +1237,8 @@ void Game::saveCubemap()
         DxGpuPerformance::endFrame();
     }
 
+    //const char *err = nullptr;
+    //SaveEXR(cubemap_raw, width * cubeFacesNum, height, 4, 0, cubemapFilePathEXR.c_str(), &err);
     stbi_write_hdr(cubemapFilePathHDR.c_str(), width * cubeFacesNum, height, 4, cubemap_raw);
     delete[] cubemap_raw;
 
