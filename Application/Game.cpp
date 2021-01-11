@@ -1189,6 +1189,8 @@ void Game::saveCubemap()
     int height = mBackBufferHdr->mDesc.Height;
     //pnm::image<pnm::rgb_pixel> cubemap(width * cubeFacesNum, height, 0xFF0000_rgb);
     float* cubemap_raw = new float[width * cubeFacesNum * height * 4];
+	float* custom_cubemap = new float[width * cubeFacesNum * height * 4];
+	generateWhiteCornerCubemap(width, height, custom_cubemap);
 
     for (int face = 0; face < cubeFacesNum; face++)
     {
@@ -1254,6 +1256,12 @@ void Game::saveCubemap()
                     //cubemap_raw[cubemap_idx + 1] = colors[face].y;
                     //cubemap_raw[cubemap_idx + 2] = colors[face].z;
                     //cubemap_raw[cubemap_idx + 3] = 1.0f;
+
+					// Custom sides.
+					//cubemap_raw[cubemap_idx + 0] = custom_cubemap[cubemap_idx + 0];
+					//cubemap_raw[cubemap_idx + 1] = custom_cubemap[cubemap_idx + 1];
+					//cubemap_raw[cubemap_idx + 2] = custom_cubemap[cubemap_idx + 2];
+					//cubemap_raw[cubemap_idx + 3] = 1.0f;
                 }
 
             context->Unmap(mBackBufferHdrStagingTexture->mTexture, 0);
@@ -1266,10 +1274,54 @@ void Game::saveCubemap()
 
     //const char *err = nullptr;
     //SaveEXR(cubemap_raw, width * cubeFacesNum, height, 4, 0, cubemapFilePathEXR.c_str(), &err);
+
+	delete[] custom_cubemap;
     stbi_write_hdr(cubemapFilePathHDR.c_str(), width * cubeFacesNum, height, 4, cubemap_raw);
     delete[] cubemap_raw;
 
     //pnm::write_ppm_ascii(cubemapFilePathPPM, cubemap);
 }
 
+void Game::generateWhiteCornerCubemap(int width, int height, float* dest)
+{
+	static const int cubeFacesNum = 6;
+
+	memset(dest, 0, sizeof(float) * width * height * cubeFacesNum * 4);
+
+	int face = 0;
+	for (int y = 0; y < height / 4; y++)
+		for (int x = 0; x < width / 4; x++)
+		{
+			int cubemap_idx = (y * width * cubeFacesNum + face * width + x) * 4;
+
+			dest[cubemap_idx + 0] = 255.0f;
+			dest[cubemap_idx + 1] = 255.0f;
+			dest[cubemap_idx + 2] = 255.0f;
+			dest[cubemap_idx + 3] = 1.0f;
+		}
+
+	face = 2;
+	for (int y = height - height / 4; y < height; y++)
+		for (int x = width - width / 4; x < width; x++)
+		{
+			int cubemap_idx = (y * width * cubeFacesNum + face * width + x) * 4;
+
+			dest[cubemap_idx + 0] = 255.0f;
+			dest[cubemap_idx + 1] = 255.0f;
+			dest[cubemap_idx + 2] = 255.0f;
+			dest[cubemap_idx + 3] = 1.0f;
+		}
+
+	face = 4;
+	for (int y = 0; y < height / 4; y++)
+		for (int x = width - width / 4; x < width; x++)
+		{
+			int cubemap_idx = (y * width * cubeFacesNum + face * width + x) * 4;
+
+			dest[cubemap_idx + 0] = 255.0f;
+			dest[cubemap_idx + 1] = 255.0f;
+			dest[cubemap_idx + 2] = 255.0f;
+			dest[cubemap_idx + 3] = 1.0f;
+		}
+}
 

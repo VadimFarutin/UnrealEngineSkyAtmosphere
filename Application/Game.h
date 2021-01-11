@@ -375,6 +375,8 @@ private:
 
 	void SaveState();
 	void LoadState();
+
+	void generateWhiteCornerCubemap(int width, int height, float* dest);
 };
 
 
