@@ -11,8 +11,6 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "../tinyexr/examples/common/stb_image_write.h"
 
-#include <pnm.hpp>
-
 #undef max
 #define TINYEXR_IMPLEMENTATION
 #include <tinyexr/tinyexr.h>
@@ -1121,7 +1119,7 @@ void Game::saveScreenShot()
     }
 }
 
-void Game::saveCubemap(FileType type)
+void Game::saveCubemap(CubemapType cubemap_type, FileType file_type)
 {
     static const float2 cubeFacesViewParams[CUBE_FACES_NUM] = {
         float2(0.0, 180.0), // -X
@@ -1131,23 +1129,56 @@ void Game::saveCubemap(FileType type)
 		float2(0.0, -90.0), // -Y
 		float2(0.0, 90.0),  // +Y
 	};
-	//static const float3 colors[CUBE_FACES_NUM] = {
-	//	float3(255.0, 0.0, 0.0),   // +X
-	//	float3(0.0, 255.0, 0.0), // -X
-	//	float3(0.0, 0.0, 255.0),  // +Y
-	//	float3(255.0, 255.0, 0.0), // -Y
-	//	float3(255.0, 0.0, 255.0),  // +Z
-	//	float3(0.0, 255.0, 255.0), // -Z
-	//};
-	// 1 white and 5 black
-	static const float3 colors[CUBE_FACES_NUM] = {
-		float3(0.0, 0.0, 0.0),
-		float3(0.0, 0.0, 0.0),
-		float3(0.0, 0.0, 0.0),
-		float3(0.0, 0.0, 0.0),
-		float3(0.0, 0.0, 0.0),
-		float3(255.0, 255.0, 255.0),
-	};
+
+	static float3 colors[CUBE_FACES_NUM];
+
+	for (int i = 0; i < CUBE_FACES_NUM; i++)
+	{
+		colors[i] = float3(0.0, 0.0, 0.0);
+	}
+
+	switch (cubemap_type)
+	{
+	case Game::SCREENSHOT:
+		break;
+	case Game::SINGLE_COLORED:
+		colors[0] = float3(255.0, 0.0, 0.0);   // +X
+		colors[1] = float3(0.0, 255.0, 0.0); // -X
+		colors[2] = float3(0.0, 0.0, 255.0);  // +Y
+		colors[3] = float3(255.0, 255.0, 0.0); // -Y
+		colors[4] = float3(255.0, 0.0, 255.0);  // +Z
+		colors[5] = float3(0.0, 255.0, 255.0); // -Z
+
+		break;
+	case Game::WHITE_SIDE_1:
+		colors[0] = float3(255.0, 255.0, 255.0);
+
+		break;
+	case Game::WHITE_SIDE_2:
+		colors[1] = float3(255.0, 255.0, 255.0);
+
+		break;
+	case Game::WHITE_SIDE_3:
+		colors[2] = float3(255.0, 255.0, 255.0);
+
+		break;
+	case Game::WHITE_SIDE_4:
+		colors[3] = float3(255.0, 255.0, 255.0);
+
+		break;
+	case Game::WHITE_SIDE_5:
+		colors[4] = float3(255.0, 255.0, 255.0);
+
+		break;
+	case Game::WHITE_SIDE_6:
+		colors[5] = float3(255.0, 255.0, 255.0);
+
+		break;
+	case Game::WHITE_CORNER:
+		break;
+	default:
+		break;
+	}
 
 	//static const float2 cubeFacesViewParams[CUBE_FACES_NUM] = {
         //float2(0.0, 0.0),   // +X
@@ -1236,15 +1267,53 @@ void Game::saveCubemap(FileType type)
                     sampleCount = sampleCount > 0.0f ? sampleCount : 1.0f;
 					int cubemap_idx = getCubemapIdx(x, y, face, width, height);
 
-					switch (type)
+					float4 rgba;
+
+					switch (cubemap_type)
+					{
+					case Game::SCREENSHOT:
+						// Screenshot.
+						rgba.x = data[i + 0] / sampleCount;
+						rgba.y = data[i + 1] / sampleCount;
+						rgba.z = data[i + 2] / sampleCount;
+						rgba.w = 1.0f;
+						break;
+
+					case Game::SINGLE_COLORED:
+					case Game::WHITE_SIDE_1:
+					case Game::WHITE_SIDE_2:
+					case Game::WHITE_SIDE_3:
+					case Game::WHITE_SIDE_4:
+					case Game::WHITE_SIDE_5:
+					case Game::WHITE_SIDE_6:
+						// Single color sides.
+						rgba.x = colors[face].x;
+						rgba.y = colors[face].y;
+						rgba.z = colors[face].z;
+						rgba.w = 1.0f;
+						break;
+
+					case Game::WHITE_CORNER:
+						// Custom sides.
+						rgba.x = custom_cubemap[cubemap_idx + 0];
+						rgba.y = custom_cubemap[cubemap_idx + 1];
+						rgba.z = custom_cubemap[cubemap_idx + 2];
+						rgba.w = 1.0f;
+
+						break;
+					default:
+						break;
+					}
+
+					switch (file_type)
 					{
 					case HDR:
 					case EXR:
-						// Screenshot.
-						cubemap_raw[cubemap_idx + 0] = data[i] / sampleCount;
-						cubemap_raw[cubemap_idx + 1] = data[i + 1] / sampleCount;
-						cubemap_raw[cubemap_idx + 2] = data[i + 2] / sampleCount;
-						cubemap_raw[cubemap_idx + 3] = 1.0f;
+
+						cubemap_raw[cubemap_idx + 0] = rgba.x;
+						cubemap_raw[cubemap_idx + 1] = rgba.y;
+						cubemap_raw[cubemap_idx + 2] = rgba.z;
+						cubemap_raw[cubemap_idx + 3] = rgba.w;
 
 						// Tone mapping.
 						//float3 white_point = float3(1.08241, 0.96756, 0.95003);
@@ -1254,25 +1323,14 @@ void Game::saveCubemap(FileType type)
 						//    pow(1.0 - exp(-data[i + 1] / sampleCount / white_point.y * exposure), 1.0 / 2.2),
 						//    pow(1.0 - exp(-data[i + 2] / sampleCount / white_point.z * exposure), 1.0 / 2.2));
 
-						// Single color sides.
-						//cubemap_raw[cubemap_idx + 0] = colors[face].x;
-						//cubemap_raw[cubemap_idx + 1] = colors[face].y;
-						//cubemap_raw[cubemap_idx + 2] = colors[face].z;
-						//cubemap_raw[cubemap_idx + 3] = 1.0f;
-
-						// Custom sides.
-						//cubemap_raw[cubemap_idx + 0] = custom_cubemap[cubemap_idx + 0];
-						//cubemap_raw[cubemap_idx + 1] = custom_cubemap[cubemap_idx + 1];
-						//cubemap_raw[cubemap_idx + 2] = custom_cubemap[cubemap_idx + 2];
-						//cubemap_raw[cubemap_idx + 3] = 1.0f;
-
 						break;
 					case PPM:
 						// PNM.
 						cubemap[y][x + face * width] = pnm::rgb_pixel(
-						    255.0 * data[i] / sampleCount,
-						    255.0 * data[i + 1] / sampleCount,
-						    255.0 * data[i + 2] / sampleCount);
+						    255.0 * rgba.x,
+						    255.0 * rgba.y,
+						    255.0 * rgba.z);
+
 						break;
 					default:
 						break;
@@ -1287,7 +1345,7 @@ void Game::saveCubemap(FileType type)
         DxGpuPerformance::endFrame();
     }
 
-	writeCubemapToFile(type, width, height, cubemap_raw, &cubemap);
+	writeCubemapToFile(file_type, width, height, cubemap_raw, &cubemap);
 
 	delete[] custom_cubemap;
     delete[] cubemap_raw;

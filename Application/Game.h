@@ -3,9 +3,10 @@
 
 #pragma once
 
+#include <pnm.hpp>
+
 #include "Dx11Base/WindowInput.h"
 #include "Dx11Base/Dx11Device.h"
-
 
 #include "SkyAtmosphereCommon.h"
 #include "GpuDebugRenderer.h"
@@ -51,8 +52,20 @@ public:
     void getViewParams(float& viewPitch, float& viewYaw);
     void setViewParams(float viewPitch, float viewYaw);
 
-    void saveScreenShot();
-    void saveCubemap(FileType type = HDR);
+	enum CubemapType {
+		SCREENSHOT = 0,
+		SINGLE_COLORED,
+		WHITE_SIDE_1,
+		WHITE_SIDE_2,
+		WHITE_SIDE_3,
+		WHITE_SIDE_4,
+		WHITE_SIDE_5,
+		WHITE_SIDE_6,
+		WHITE_CORNER,
+	};
+
+	void saveScreenShot();
+	void saveCubemap(CubemapType cubemap_type = SCREENSHOT, FileType file_type = HDR);
 
 private:
 
