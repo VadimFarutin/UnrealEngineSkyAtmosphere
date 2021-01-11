@@ -1250,6 +1250,14 @@ void Game::saveCubemap()
                     cubemap_raw[cubemap_idx + 1] = data[i + 1] / sampleCount;
                     cubemap_raw[cubemap_idx + 2] = data[i + 2] / sampleCount;
                     cubemap_raw[cubemap_idx + 3] = 1.0f;
+
+					// Tone mapping.
+                    //float3 white_point = float3(1.08241, 0.96756, 0.95003);
+                    //float exposure = 10.0;
+                    //float3 rgbA(
+                    //    pow(1.0 - exp(-data[i + 0] / sampleCount / white_point.x * exposure), 1.0 / 2.2),
+                    //    pow(1.0 - exp(-data[i + 1] / sampleCount / white_point.y * exposure), 1.0 / 2.2),
+                    //    pow(1.0 - exp(-data[i + 2] / sampleCount / white_point.z * exposure), 1.0 / 2.2));
                     
 					// Single color sides.
 					//cubemap_raw[cubemap_idx + 0] = colors[face].x;
