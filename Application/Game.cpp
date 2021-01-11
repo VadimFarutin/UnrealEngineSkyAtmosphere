@@ -1131,6 +1131,33 @@ void Game::saveCubemap()
 		float2(0.0, -90.0), // -Y
 		float2(0.0, 90.0),  // +Y
 	};
+	//static const float2 cubeFacesViewParams[cubeFacesNum] = {
+        //float2(0.0, 0.0),   // +X
+        //float2(0.0, -90.0), // -Y
+        //float2(0.0, -180.0), // -X
+        //float2(0.0, 90.0),  // +Y
+
+        //float2(0.0, 0.0),   // +X
+        //float2(0.0, -60.0), // -Y
+        //float2(0.0, -120.0), // -X
+        //float2(0.0, -180.0),  // +Y
+
+        //float2(0.0, 0.0),   // +X
+        //float2(0.0, -120.0), // -Y
+        //float2(0.0, -240.0), // -X
+
+        //float2(0.0, 0.0),  // +Y
+        //float2(0.0, -45.0),  // +Y
+        //float2(0.0, -90.0),  // +Y
+        //float2(0.0, -135.0),  // +Y
+        //float2(0.0, -180.0),  // +Y
+        //float2(0.0, 135.0),  // +Y
+        //float2(0.0, 90.0),  // +Y
+        //float2(0.0, 45.0),  // +Y
+
+        //float2(90.0, 0.0),  // +Z
+        //float2(-90.0, 0.0), // -Z
+    //};
     std::string cubemapFilePathPPM = "screenshots/cubemap_" + std::to_string(mFrameId) + ".ppm";
     std::string cubemapFilePathHDR = "screenshots/cubemap_" + std::to_string(mFrameId) + ".hdr";
 
