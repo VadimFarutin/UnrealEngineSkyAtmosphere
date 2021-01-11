@@ -1131,6 +1131,24 @@ void Game::saveCubemap()
 		float2(0.0, -90.0), // -Y
 		float2(0.0, 90.0),  // +Y
 	};
+	//static const float3 colors[cubeFacesNum] = {
+	//	float3(255.0, 0.0, 0.0),   // +X
+	//	float3(0.0, 255.0, 0.0), // -X
+	//	float3(0.0, 0.0, 255.0),  // +Y
+	//	float3(255.0, 255.0, 0.0), // -Y
+	//	float3(255.0, 0.0, 255.0),  // +Z
+	//	float3(0.0, 255.0, 255.0), // -Z
+	//};
+	// 1 white and 5 black
+	static const float3 colors[cubeFacesNum] = {
+		float3(0.0, 0.0, 0.0),
+		float3(0.0, 0.0, 0.0),
+		float3(0.0, 0.0, 0.0),
+		float3(0.0, 0.0, 0.0),
+		float3(0.0, 0.0, 0.0),
+		float3(255.0, 255.0, 255.0),
+	};
+
 	//static const float2 cubeFacesViewParams[cubeFacesNum] = {
         //float2(0.0, 0.0),   // +X
         //float2(0.0, -90.0), // -Y
@@ -1230,6 +1248,12 @@ void Game::saveCubemap()
                     cubemap_raw[cubemap_idx + 1] = data[i + 1] / sampleCount;
                     cubemap_raw[cubemap_idx + 2] = data[i + 2] / sampleCount;
                     cubemap_raw[cubemap_idx + 3] = 1.0f;
+                    
+					// Single color sides.
+					//cubemap_raw[cubemap_idx + 0] = colors[face].x;
+                    //cubemap_raw[cubemap_idx + 1] = colors[face].y;
+                    //cubemap_raw[cubemap_idx + 2] = colors[face].z;
+                    //cubemap_raw[cubemap_idx + 3] = 1.0f;
                 }
 
             context->Unmap(mBackBufferHdrStagingTexture->mTexture, 0);
