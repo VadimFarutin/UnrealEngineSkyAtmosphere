@@ -60,5 +60,14 @@ float4 PostProcessPS(VertexOutput input) : SV_TARGET
 	return float4( pow((float3) 1.0 - exp(-rgbA.rgb / white_point * exposure), (float3)(1.0 / 2.2)), 1.0 );
 }
 
+float4 NoPostProcessPS(VertexOutput input) : SV_TARGET
+{
+	uint2 texCoord = input.position.xy;
+
+	float4 rgbA = texture2d.Load(uint3(texCoord,0));
+	rgbA /= rgbA.aaaa;	// Normalise according to sample count when path tracing
+	//return float4(rgbA.b, rgbA.g, rgbA.r, rgbA.a);
+	return rgbA;
+}
 
 

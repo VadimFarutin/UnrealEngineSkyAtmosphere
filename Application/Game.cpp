@@ -1,5 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
+#define _CRT_SECURE_NO_WARNINGS
 
 #include "Game.h"
 #include "GpuDebugRenderer.h"
@@ -7,11 +8,14 @@
 #include "windows.h"
 
 #include <imgui.h>
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "../tinyexr/examples/common/stb_image_write.h"
 
 #undef max
 #define TINYEXR_IMPLEMENTATION
 #include <tinyexr/tinyexr.h>
 
+const int Game::CUBE_FACES_NUM = 6;
 
 Game::Game()
 {
@@ -64,7 +68,10 @@ void Game::loadShaders(bool firstTimeLoadShaders)
 	const bool lazyCompilation = true;
 	success &= reloadShader(&mVertexShader, L"Resources\\Common.hlsl", "DefaultVertexShader", firstTimeLoadShaders, nullptr, false);				// No lazy compilation because it is used to create a layout
 	success &= reloadShader(&mScreenVertexShader, L"Resources\\Common.hlsl", "ScreenTriangleVertexShader", firstTimeLoadShaders, nullptr, false);	// No lazy compilation because it is used to create a layout
-	success &= reload(&mPostProcessShader, L"Resources\\PostProcess.hlsl", "PostProcessPS", firstTimeLoadShaders, nullptr, lazyCompilation);
+	if (mPostProcess)
+        success &= reload(&mPostProcessShader, L"Resources\\PostProcess.hlsl", "PostProcessPS", firstTimeLoadShaders, nullptr, lazyCompilation);
+	else
+		success &= reload(&mPostProcessShader, L"Resources\\PostProcess.hlsl", "NoPostProcessPS", firstTimeLoadShaders, nullptr, lazyCompilation);
 	success &= reload(&mApplySkyAtmosphereShader, L"Resources\\PostProcess.hlsl", "ApplySkyAtmospherePS", firstTimeLoadShaders, nullptr, lazyCompilation);
 
 	success &= reload(&GeometryGS, L"Resources\\Common.hlsl", "LutGS", firstTimeLoadShaders, nullptr, lazyCompilation);
@@ -615,12 +622,14 @@ void Game::update(const WindowInputData& inputData)
 
 	const D3dViewport& backBufferViewport = g_dx11Device->getBackBufferViewport();
 	float aspectRatioXOverY = backBufferViewport.Width / backBufferViewport.Height;
-	mCamPosFinal = { 0.0, 0.0f, 0.0f };
+    mBackBufferViewportWidth = backBufferViewport.Width;
+    mBackBufferViewportHeight = backBufferViewport.Height;
+    mCamPosFinal = { 0.0, 0.0f, 0.0f };
 
 	// Camera orientation
-	if (viewPitch > 80.0f) viewPitch = 80.0f;
-	if (viewPitch < -80.0f) viewPitch = -80.0f;
-	XMMATRIX BBB = XMMatrixRotationRollPitchYaw(-viewPitch * 3.14159f / 180.0f, viewYaw*3.14159f / 180.0f, 0.0f);
+    if (viewPitch > 90.0f) viewPitch = 90.0f;
+    if (viewPitch < -90.0f) viewPitch = -90.0f;
+    XMMATRIX BBB = XMMatrixRotationRollPitchYaw(-viewPitch * 3.14159f / 180.0f, viewYaw*3.14159f / 180.0f, 0.0f);
 	XMStoreFloat3(&mViewDir, BBB.r[2]);
 	float3 viewDirCopy = mViewDir;
 	mViewDir.y = viewDirCopy.z;
@@ -637,8 +646,9 @@ void Game::update(const WindowInputData& inputData)
 		FXMVECTOR upDirection = { 0.0f, 0.0f, 1.0f, 0.0f };	// Unreal z-up
 
 		XMMATRIX viewMatrix = XMMatrixLookAtLH(eyePosition, focusPosition, upDirection);
-		XMMATRIX projMatrix = XMMatrixPerspectiveFovLH(66.6f*3.14159f / 180.0f, aspectRatioXOverY, 0.1f, 20000.0f);
-		mViewProjMat = XMMatrixMultiply(viewMatrix, projMatrix);
+		//XMMATRIX projMatrix = XMMatrixPerspectiveFovLH(66.6f*3.14159f / 180.0f, aspectRatioXOverY, 0.1f, 20000.0f);
+        XMMATRIX projMatrix = XMMatrixPerspectiveFovLH(90.0f / 180.0f * 3.14159f, aspectRatioXOverY, 0.1f, 20000.0f);
+        mViewProjMat = XMMatrixMultiply(viewMatrix, projMatrix);
 	}
 
 	XMMATRIX sunMatrix = XMMatrixRotationRollPitchYaw(-uiSunPitch, uiSunYaw, 0.0f);
@@ -793,9 +803,14 @@ void Game::render()
 		ImGui::Checkbox("PrintDebug", &mPrintDebug);
 		ImGui::Separator();
 
+        ImGui::Text(std::string("Viewport Width: " + std::to_string(mBackBufferViewportWidth)).c_str());
+        ImGui::Text(std::string("Viewport Height: " + std::to_string(mBackBufferViewportHeight)).c_str());
+
 		ImGui::Text("View");
 		ImGui::SliderFloat("Height", &uiCamHeight, 0.001f, 2.0f*(AtmosphereInfos.top_radius - AtmosphereInfos.bottom_radius), "%.3f", 3.0f);
 		ImGui::SliderFloat("Forward", &uiCamForward, -3.0f*AtmosphereInfos.top_radius, -1.0f, "%.3f", 3.0f);
+        ImGui::SliderFloat("View Yaw", &viewYaw, -180.0f, 180.0f);
+        ImGui::SliderFloat("View Pitch", &viewPitch, -90.0f, 90.0f);
 
 		ImGui::Text("Sun");
 		ImGui::SliderFloat("IllumScale", &mSunIlluminanceScale, 0.1f, 100.0f, "%.3f", 3.0f);
@@ -889,6 +904,8 @@ void Game::render()
 			if (ImGui::IsItemHovered())
 				ImGui::SetTooltip("If DualScattering>0, the path tracer will use it and stop at the first path depth.");
 		}
+
+        ImGui::Checkbox("Post process", &mPostProcess);
 
 		ImGui::End();
 		////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1067,17 +1084,374 @@ void Game::render()
 		context->OMSetDepthStencilState(mDefaultDepthStencilState->mState, 0);
 	}
 
-	if (takeScreenShot)
-	{
-		const char* screenShotFilePath = "screenshot.exr";
-		D3dRenderContext* context = g_dx11Device->getDeviceContext();
-		context->CopyResource(mBackBufferHdrStagingTexture->mTexture, mBackBufferHdr->mTexture);
-		saveBackBufferHdr(screenShotFilePath);
-		takeScreenShot = false;
-	}
 	mFrameId++;
 
 }
 
+bool Game::shouldTakeScreenShot() const
+{
+    return takeScreenShot;
+}
 
+void Game::getViewParams(float& viewPitch, float& viewYaw)
+{
+    viewPitch = this->viewPitch;
+    viewYaw = this->viewYaw;
+}
 
+void Game::setViewParams(float viewPitch, float viewYaw)
+{
+    this->viewPitch = viewPitch;
+    this->viewYaw = viewYaw;
+    this->ShouldClearPathTracedBuffer = true;
+}
+
+void Game::saveScreenShot()
+{
+    if (takeScreenShot)
+    {
+        std::string screenShotFilePath = "screenshots/screenshot_" + std::to_string(mFrameId) + ".exr";
+        //const char* screenShotFilePath = "screenshots/screenshot.exr";
+        D3dRenderContext* context = g_dx11Device->getDeviceContext();
+        context->CopyResource(mBackBufferHdrStagingTexture->mTexture, mBackBufferHdr->mTexture);
+        saveBackBufferHdr(screenShotFilePath.c_str());
+        takeScreenShot = false;
+    }
+}
+
+void Game::saveCubemap(CubemapType cubemap_type, FileType file_type)
+{
+    static const float2 cubeFacesViewParams[CUBE_FACES_NUM] = {
+        float2(0.0, 180.0), // -X
+        float2(0.0, 0.0),   // +X
+        float2(90.0, -90.0),  // +Z
+        float2(-90.0, -90.0), // -Z
+		float2(0.0, -90.0), // -Y
+		float2(0.0, 90.0),  // +Y
+	};
+
+	static float3 colors[CUBE_FACES_NUM];
+
+	for (int i = 0; i < CUBE_FACES_NUM; i++)
+	{
+		colors[i] = float3(0.0, 0.0, 0.0);
+	}
+
+	switch (cubemap_type)
+	{
+	case Game::SCREENSHOT:
+		break;
+	case Game::SINGLE_COLORED:
+		colors[0] = float3(255.0, 0.0, 0.0);   // +X
+		colors[1] = float3(0.0, 255.0, 0.0); // -X
+		colors[2] = float3(0.0, 0.0, 255.0);  // +Y
+		colors[3] = float3(255.0, 255.0, 0.0); // -Y
+		colors[4] = float3(255.0, 0.0, 255.0);  // +Z
+		colors[5] = float3(0.0, 255.0, 255.0); // -Z
+
+		break;
+	case Game::WHITE_SIDE_1:
+		colors[0] = float3(255.0, 255.0, 255.0);
+
+		break;
+	case Game::WHITE_SIDE_2:
+		colors[1] = float3(255.0, 255.0, 255.0);
+
+		break;
+	case Game::WHITE_SIDE_3:
+		colors[2] = float3(255.0, 255.0, 255.0);
+
+		break;
+	case Game::WHITE_SIDE_4:
+		colors[3] = float3(255.0, 255.0, 255.0);
+
+		break;
+	case Game::WHITE_SIDE_5:
+		colors[4] = float3(255.0, 255.0, 255.0);
+
+		break;
+	case Game::WHITE_SIDE_6:
+		colors[5] = float3(255.0, 255.0, 255.0);
+
+		break;
+	case Game::WHITE_CORNER:
+		break;
+	default:
+		break;
+	}
+
+	//static const float2 cubeFacesViewParams[CUBE_FACES_NUM] = {
+        //float2(0.0, 0.0),   // +X
+        //float2(0.0, -90.0), // -Y
+        //float2(0.0, -180.0), // -X
+        //float2(0.0, 90.0),  // +Y
+
+        //float2(0.0, 0.0),   // +X
+        //float2(0.0, -60.0), // -Y
+        //float2(0.0, -120.0), // -X
+        //float2(0.0, -180.0),  // +Y
+
+        //float2(0.0, 0.0),   // +X
+        //float2(0.0, -120.0), // -Y
+        //float2(0.0, -240.0), // -X
+
+        //float2(0.0, 0.0),  // +Y
+        //float2(0.0, -45.0),  // +Y
+        //float2(0.0, -90.0),  // +Y
+        //float2(0.0, -135.0),  // +Y
+        //float2(0.0, -180.0),  // +Y
+        //float2(0.0, 135.0),  // +Y
+        //float2(0.0, 90.0),  // +Y
+        //float2(0.0, 45.0),  // +Y
+
+        //float2(90.0, 0.0),  // +Z
+        //float2(-90.0, 0.0), // -Z
+    //};
+
+    WindowInputData inputData;
+    inputData.init();
+
+    using namespace pnm::literals;
+    
+    int width = mBackBufferHdr->mDesc.Width;
+    int height = mBackBufferHdr->mDesc.Height;
+    pnm::image<pnm::rgb_pixel> cubemap(width * CUBE_FACES_NUM, height, 0xFF0000_rgb);
+    float* cubemap_raw = new float[width * CUBE_FACES_NUM * height * 4];
+	float* custom_cubemap = new float[width * CUBE_FACES_NUM * height * 4];
+	generateWhiteCornerCubemap(width, height, custom_cubemap);
+
+    for (int face = 0; face < CUBE_FACES_NUM; face++)
+    {
+        DxGpuPerformance::startFrame();
+        const char* frameGpuTimerName = "Frame";
+        DxGpuPerformance::startGpuTimer(frameGpuTimerName, 150, 150, 150);
+        ImGui::NewFrame();
+
+        setViewParams(cubeFacesViewParams[face].x, cubeFacesViewParams[face].y);
+        update(inputData);
+        render();
+
+        D3dRenderContext* context = g_dx11Device->getDeviceContext();
+        context->CopyResource(mBackBufferHdrStagingTexture->mTexture, mBackBufferHdr->mTexture);
+
+        const D3D11_TEXTURE2D_DESC& desc = mBackBufferHdrStagingTexture->mDesc;
+        ATLASSERT(desc.Format == DXGI_FORMAT_R32G32B32A32_FLOAT);
+
+        //D3dRenderContext* context = g_dx11Device->getDeviceContext();
+        D3D11_MAPPED_SUBRESOURCE mappedResource;
+        HRESULT res = context->Map(mBackBufferHdrStagingTexture->mTexture, 0, D3D11_MAP_READ, 0, &mappedResource);
+        ATLASSERT(res == S_OK);
+        if (res == S_OK)
+        {
+            const float* data = (float*)mappedResource.pData;
+
+            //float max_value = 0.0;
+            //for (int p = 0; p < height * width; p++)
+            //{
+            //    int i = p * 4;
+            //    for (int j = 0; j < 3; j++)
+            //    {
+            //        max_value = MZ_MAX(max_value, data[i + j]);
+            //    }
+            //}
+            //if (max_value == 0.0)
+            //{
+            //    max_value = 1.0;
+            //}
+
+            for (int y = 0; y < height; y++)
+                for (int x = 0; x < width; x++)
+                {
+                    int i = (y * width + x) * 4;
+                    float sampleCount = data[i + 3];
+                    sampleCount = sampleCount > 0.0f ? sampleCount : 1.0f;
+					int cubemap_idx = getCubemapIdx(x, y, face, width, height);
+
+					float4 rgba;
+
+					switch (cubemap_type)
+					{
+					case Game::SCREENSHOT:
+						// Screenshot.
+						rgba.x = data[i + 0] / sampleCount;
+						rgba.y = data[i + 1] / sampleCount;
+						rgba.z = data[i + 2] / sampleCount;
+						rgba.w = 1.0f;
+						break;
+
+					case Game::SINGLE_COLORED:
+					case Game::WHITE_SIDE_1:
+					case Game::WHITE_SIDE_2:
+					case Game::WHITE_SIDE_3:
+					case Game::WHITE_SIDE_4:
+					case Game::WHITE_SIDE_5:
+					case Game::WHITE_SIDE_6:
+						// Single color sides.
+						rgba.x = colors[face].x;
+						rgba.y = colors[face].y;
+						rgba.z = colors[face].z;
+						rgba.w = 1.0f;
+						break;
+
+					case Game::WHITE_CORNER:
+						// Custom sides.
+						rgba.x = custom_cubemap[cubemap_idx + 0];
+						rgba.y = custom_cubemap[cubemap_idx + 1];
+						rgba.z = custom_cubemap[cubemap_idx + 2];
+						rgba.w = 1.0f;
+
+						break;
+					default:
+						break;
+					}
+
+					switch (file_type)
+					{
+					case HDR:
+					case EXR:
+
+						cubemap_raw[cubemap_idx + 0] = rgba.x;
+						cubemap_raw[cubemap_idx + 1] = rgba.y;
+						cubemap_raw[cubemap_idx + 2] = rgba.z;
+						cubemap_raw[cubemap_idx + 3] = rgba.w;
+
+						// Tone mapping.
+						//float3 white_point = float3(1.08241, 0.96756, 0.95003);
+						//float exposure = 10.0;
+						//float3 rgbA(
+						//    pow(1.0 - exp(-data[i + 0] / sampleCount / white_point.x * exposure), 1.0 / 2.2),
+						//    pow(1.0 - exp(-data[i + 1] / sampleCount / white_point.y * exposure), 1.0 / 2.2),
+						//    pow(1.0 - exp(-data[i + 2] / sampleCount / white_point.z * exposure), 1.0 / 2.2));
+
+						break;
+					case PPM:
+						// PNM.
+						cubemap[y][x + face * width] = pnm::rgb_pixel(
+						    255.0 * rgba.x,
+						    255.0 * rgba.y,
+						    255.0 * rgba.z);
+
+						break;
+					default:
+						break;
+					}
+                }
+
+            context->Unmap(mBackBufferHdrStagingTexture->mTexture, 0);
+        }
+
+        ImGui::EndFrame();
+        DxGpuPerformance::endGpuTimer(frameGpuTimerName);
+        DxGpuPerformance::endFrame();
+    }
+
+	writeCubemapToFile(file_type, width, height, cubemap_raw, &cubemap);
+
+	delete[] custom_cubemap;
+    delete[] cubemap_raw;
+
+}
+
+void Game::generateWhiteCornerCubemap(int width, int height, float* dest)
+{
+	memset(dest, 0, sizeof(float) * width * height * CUBE_FACES_NUM * 4);
+
+	int face = 0;
+	for (int y = 0; y < height / 4; y++)
+		for (int x = 0; x < width / 4; x++)
+		{
+			int cubemap_idx = getCubemapIdx(x, y, face, width, height);
+
+			dest[cubemap_idx + 0] = 255.0f;
+			dest[cubemap_idx + 1] = 255.0f;
+			dest[cubemap_idx + 2] = 255.0f;
+			dest[cubemap_idx + 3] = 1.0f;
+		}
+
+	face = 2;
+	for (int y = height - height / 4; y < height; y++)
+		for (int x = width - width / 4; x < width; x++)
+		{
+			int cubemap_idx = getCubemapIdx(x, y, face, width, height);
+
+			dest[cubemap_idx + 0] = 255.0f;
+			dest[cubemap_idx + 1] = 255.0f;
+			dest[cubemap_idx + 2] = 255.0f;
+			dest[cubemap_idx + 3] = 1.0f;
+		}
+
+	face = 4;
+	for (int y = 0; y < height / 4; y++)
+		for (int x = width - width / 4; x < width; x++)
+		{
+			int cubemap_idx = getCubemapIdx(x, y, face, width, height);
+
+			dest[cubemap_idx + 0] = 255.0f;
+			dest[cubemap_idx + 1] = 255.0f;
+			dest[cubemap_idx + 2] = 255.0f;
+			dest[cubemap_idx + 3] = 1.0f;
+		}
+}
+
+int Game::getCubemapIdx(int x, int y, int face, int width, int height)
+{
+	return (y * width * CUBE_FACES_NUM + face * width + x) * 4;
+}
+
+std::string Game::getCubemapPath(FileType type, uint32 frameId)
+{
+	std::string cubemapFilePath = "screenshots/cubemap_" + std::to_string(frameId);
+	std::string extension = "";
+
+	switch (type)
+	{
+	case HDR:
+		extension = ".hdr";
+		break;
+	case EXR:
+		extension = ".exr";
+		break;
+	case PPM:
+		extension = ".ppm";
+		break;
+	default:
+		break;
+	}
+
+	cubemapFilePath = cubemapFilePath + extension;
+
+	return cubemapFilePath;
+}
+
+void Game::writeCubemapToFile(
+	FileType type,
+	int width, int height,
+	float* src, pnm::image<pnm::rgb_pixel>* image)
+{
+	std::string cubemapFilePath = getCubemapPath(type, mFrameId);
+
+	switch (type)
+	{
+	case HDR:
+		if (src != nullptr)
+		{
+			stbi_write_hdr(cubemapFilePath.c_str(), width * CUBE_FACES_NUM, height, 4, src);
+		}
+		break;
+	case EXR:
+		if (src != nullptr)
+		{
+			const char* err = nullptr;
+			SaveEXR(src, width * CUBE_FACES_NUM, height, 4, 0, cubemapFilePath.c_str(), &err);
+		}
+		break;
+	case PPM:
+		if (image != nullptr)
+		{
+			pnm::write_ppm_ascii(cubemapFilePath, *image);
+		}
+		break;
+	default:
+		break;
+	}
+}

@@ -49,7 +49,14 @@ LRESULT CALLBACK WindowProcess(HWND hWnd, UINT message, WPARAM wParam, LPARAM lP
 			window->processWindowSizeMessage(message, wParam, lParam);
 		}
 		break;
-	}
+
+    case WM_GETMINMAXINFO:
+        LPMINMAXINFO lpmmi = (LPMINMAXINFO)lParam;
+        lpmmi->ptMaxTrackSize.x = 10000;
+        lpmmi->ptMaxTrackSize.y = 10000;
+        return 0;
+        break;
+    }
 
 	// Handle any messages the switch statement didn't
 	return DefWindowProc(hWnd, message, wParam, lParam);

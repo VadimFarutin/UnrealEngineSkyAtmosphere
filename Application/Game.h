@@ -3,9 +3,10 @@
 
 #pragma once
 
+#include <pnm.hpp>
+
 #include "Dx11Base/WindowInput.h"
 #include "Dx11Base/Dx11Device.h"
-
 
 #include "SkyAtmosphereCommon.h"
 #include "GpuDebugRenderer.h"
@@ -28,6 +29,12 @@ struct CaptureState
 	std::vector<CaptureEvent> events;
 };
 
+enum FileType {
+	HDR = 0,
+	EXR,
+	PPM,
+};
+
 class Game
 {
 public:
@@ -40,6 +47,25 @@ public:
 
 	void update(const WindowInputData& inputData);
 	void render();
+
+    bool shouldTakeScreenShot() const;
+    void getViewParams(float& viewPitch, float& viewYaw);
+    void setViewParams(float viewPitch, float viewYaw);
+
+	enum CubemapType {
+		SCREENSHOT = 0,
+		SINGLE_COLORED,
+		WHITE_SIDE_1,
+		WHITE_SIDE_2,
+		WHITE_SIDE_3,
+		WHITE_SIDE_4,
+		WHITE_SIDE_5,
+		WHITE_SIDE_6,
+		WHITE_CORNER,
+	};
+
+	void saveScreenShot();
+	void saveCubemap(CubemapType cubemap_type = SCREENSHOT, FileType file_type = HDR);
 
 private:
 
@@ -247,6 +273,9 @@ private:
 	const uint32 ShadowmapSize = 4096;
 	float4x4 mShadowmapViewProjMat;
 
+    float mBackBufferViewportWidth;
+    float mBackBufferViewportHeight;
+
 	float4x4 mViewProjMat;
 	float3   mCamPos;
 	float3   mCamPosFinal;
@@ -339,6 +368,8 @@ private:
 
 	bool RenderTerrain = true;
 
+    bool mPostProcess = true;
+
 	// Render functions
 	void updateSkyAtmosphereConstant();
 	void generateSkyAtmosphereLUTs();
@@ -363,6 +394,17 @@ private:
 
 	void SaveState();
 	void LoadState();
+
+	static const int CUBE_FACES_NUM;
+	
+	void generateWhiteCornerCubemap(int width, int height, float* dest);
+	int getCubemapIdx(int x, int y, int face, int width, int height);
+
+	std::string getCubemapPath(FileType type, uint32 frameId);
+	void writeCubemapToFile(
+		FileType type,
+		int width, int height,
+		float* src, pnm::image<pnm::rgb_pixel>* image);
 };
 
 
