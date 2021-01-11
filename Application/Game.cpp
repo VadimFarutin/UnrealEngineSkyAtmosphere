@@ -17,6 +17,7 @@
 #define TINYEXR_IMPLEMENTATION
 #include <tinyexr/tinyexr.h>
 
+const int Game::CUBE_FACES_NUM = 6;
 
 Game::Game()
 {
@@ -1122,8 +1123,7 @@ void Game::saveScreenShot()
 
 void Game::saveCubemap()
 {
-    static const int cubeFacesNum = 6;
-    static const float2 cubeFacesViewParams[cubeFacesNum] = {
+    static const float2 cubeFacesViewParams[CUBE_FACES_NUM] = {
         float2(0.0, 180.0), // -X
         float2(0.0, 0.0),   // +X
         float2(90.0, -90.0),  // +Z
@@ -1131,7 +1131,7 @@ void Game::saveCubemap()
 		float2(0.0, -90.0), // -Y
 		float2(0.0, 90.0),  // +Y
 	};
-	//static const float3 colors[cubeFacesNum] = {
+	//static const float3 colors[CUBE_FACES_NUM] = {
 	//	float3(255.0, 0.0, 0.0),   // +X
 	//	float3(0.0, 255.0, 0.0), // -X
 	//	float3(0.0, 0.0, 255.0),  // +Y
@@ -1140,7 +1140,7 @@ void Game::saveCubemap()
 	//	float3(0.0, 255.0, 255.0), // -Z
 	//};
 	// 1 white and 5 black
-	static const float3 colors[cubeFacesNum] = {
+	static const float3 colors[CUBE_FACES_NUM] = {
 		float3(0.0, 0.0, 0.0),
 		float3(0.0, 0.0, 0.0),
 		float3(0.0, 0.0, 0.0),
@@ -1149,7 +1149,7 @@ void Game::saveCubemap()
 		float3(255.0, 255.0, 255.0),
 	};
 
-	//static const float2 cubeFacesViewParams[cubeFacesNum] = {
+	//static const float2 cubeFacesViewParams[CUBE_FACES_NUM] = {
         //float2(0.0, 0.0),   // +X
         //float2(0.0, -90.0), // -Y
         //float2(0.0, -180.0), // -X
@@ -1187,12 +1187,12 @@ void Game::saveCubemap()
     
     int width = mBackBufferHdr->mDesc.Width;
     int height = mBackBufferHdr->mDesc.Height;
-    //pnm::image<pnm::rgb_pixel> cubemap(width * cubeFacesNum, height, 0xFF0000_rgb);
-    float* cubemap_raw = new float[width * cubeFacesNum * height * 4];
-	float* custom_cubemap = new float[width * cubeFacesNum * height * 4];
+    //pnm::image<pnm::rgb_pixel> cubemap(width * CUBE_FACES_NUM, height, 0xFF0000_rgb);
+    float* cubemap_raw = new float[width * CUBE_FACES_NUM * height * 4];
+	float* custom_cubemap = new float[width * CUBE_FACES_NUM * height * 4];
 	generateWhiteCornerCubemap(width, height, custom_cubemap);
 
-    for (int face = 0; face < cubeFacesNum; face++)
+    for (int face = 0; face < CUBE_FACES_NUM; face++)
     {
         DxGpuPerformance::startFrame();
         const char* frameGpuTimerName = "Frame";
@@ -1237,7 +1237,7 @@ void Game::saveCubemap()
                     int i = (y * width + x) * 4;
                     float sampleCount = data[i + 3];
                     sampleCount = sampleCount > 0.0f ? sampleCount : 1.0f;
-					int cubemap_idx = (y * width * cubeFacesNum + face * width + x) * 4;
+					int cubemap_idx = getCubemapIdx(x, y, face, width, height);
 
 					// PNM.
                     //cubemap[y][x + face * width] = pnm::rgb_pixel(
@@ -1281,10 +1281,10 @@ void Game::saveCubemap()
     }
 
     //const char *err = nullptr;
-    //SaveEXR(cubemap_raw, width * cubeFacesNum, height, 4, 0, cubemapFilePathEXR.c_str(), &err);
+    //SaveEXR(cubemap_raw, width * CUBE_FACES_NUM, height, 4, 0, cubemapFilePathEXR.c_str(), &err);
 
 	delete[] custom_cubemap;
-    stbi_write_hdr(cubemapFilePathHDR.c_str(), width * cubeFacesNum, height, 4, cubemap_raw);
+    stbi_write_hdr(cubemapFilePathHDR.c_str(), width * CUBE_FACES_NUM, height, 4, cubemap_raw);
     delete[] cubemap_raw;
 
     //pnm::write_ppm_ascii(cubemapFilePathPPM, cubemap);
@@ -1292,15 +1292,13 @@ void Game::saveCubemap()
 
 void Game::generateWhiteCornerCubemap(int width, int height, float* dest)
 {
-	static const int cubeFacesNum = 6;
-
-	memset(dest, 0, sizeof(float) * width * height * cubeFacesNum * 4);
+	memset(dest, 0, sizeof(float) * width * height * CUBE_FACES_NUM * 4);
 
 	int face = 0;
 	for (int y = 0; y < height / 4; y++)
 		for (int x = 0; x < width / 4; x++)
 		{
-			int cubemap_idx = (y * width * cubeFacesNum + face * width + x) * 4;
+			int cubemap_idx = getCubemapIdx(x, y, face, width, height);
 
 			dest[cubemap_idx + 0] = 255.0f;
 			dest[cubemap_idx + 1] = 255.0f;
@@ -1312,7 +1310,7 @@ void Game::generateWhiteCornerCubemap(int width, int height, float* dest)
 	for (int y = height - height / 4; y < height; y++)
 		for (int x = width - width / 4; x < width; x++)
 		{
-			int cubemap_idx = (y * width * cubeFacesNum + face * width + x) * 4;
+			int cubemap_idx = getCubemapIdx(x, y, face, width, height);
 
 			dest[cubemap_idx + 0] = 255.0f;
 			dest[cubemap_idx + 1] = 255.0f;
@@ -1324,12 +1322,17 @@ void Game::generateWhiteCornerCubemap(int width, int height, float* dest)
 	for (int y = 0; y < height / 4; y++)
 		for (int x = width - width / 4; x < width; x++)
 		{
-			int cubemap_idx = (y * width * cubeFacesNum + face * width + x) * 4;
+			int cubemap_idx = getCubemapIdx(x, y, face, width, height);
 
 			dest[cubemap_idx + 0] = 255.0f;
 			dest[cubemap_idx + 1] = 255.0f;
 			dest[cubemap_idx + 2] = 255.0f;
 			dest[cubemap_idx + 3] = 1.0f;
 		}
+}
+
+int Game::getCubemapIdx(int x, int y, int face, int width, int height)
+{
+	return (y * width * CUBE_FACES_NUM + face * width + x) * 4;
 }
 

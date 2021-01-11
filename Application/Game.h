@@ -376,7 +376,9 @@ private:
 	void SaveState();
 	void LoadState();
 
+	static const int CUBE_FACES_NUM;
 	void generateWhiteCornerCubemap(int width, int height, float* dest);
+	int getCubemapIdx(int x, int y, int face, int width, int height);
 };
 
 
